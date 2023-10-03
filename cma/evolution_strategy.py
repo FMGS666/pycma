@@ -1542,7 +1542,11 @@ class CMAEvolutionStrategy(interfaces.OOOptimizer):
                 opts['maxstd'] = (self.boundary_handler.get_bounds('upper', self.N_pheno) -
                                   self.boundary_handler.get_bounds('lower', self.N_pheno)
                                   ) * opts['maxstd_boundrange']
-
+        
+        self.sigma_history = []
+        self.covariance_history = []
+        self.mean_history = []
+        self.samples_history = []
         # set self.mean to geno(x0)
         tf_geno_backup = self.gp.tf_geno
         if self.gp.tf_pheno and self.gp.tf_geno is None:
@@ -2006,7 +2010,7 @@ class CMAEvolutionStrategy(interfaces.OOOptimizer):
         else:
             self.timer.tic
         pop_geno = self.ask_geno(number, xmean, sigma_fac)
-
+        self.samples_history.append(pop_geno)
         # N,lambda=20,200: overall CPU 7s vs 5s == 40% overhead, even without bounds!
         #                  new data: 11.5s vs 9.5s == 20%
         # TODO: check here, whether this is necessary?
@@ -2827,6 +2831,7 @@ class CMAEvolutionStrategy(interfaces.OOOptimizer):
 
         if self.countiter > 1:
             self.mean_old_old = self.mean_old
+        self.mean_history.append(self.mean)
         self.mean_old = self.mean
         mold = self.mean_old  # just an alias
 
@@ -3049,6 +3054,8 @@ class CMAEvolutionStrategy(interfaces.OOOptimizer):
                 raise RuntimeError("A sampler variance has become negative "
                                    "after the update, this must be considered as a bug.\n"
                                    "Variances `self.sm.variances`=%s" % str(self.sm.variances))
+        
+        self.covariance_history.append(self.sm.C)
         self._updateBDfromSM(self.sm)
 
         # step-size adaptation, adapt sigma
@@ -3059,6 +3066,7 @@ class CMAEvolutionStrategy(interfaces.OOOptimizer):
         except (NotImplementedError, AttributeError):
             self.adapt_sigma.update(self, function_values=function_values)
 
+        self.sigma_history.append(self.sigma)
         if 11 < 3 and self.opts['vv']:
             if self.countiter < 2:
                 print('constant sigma applied')
